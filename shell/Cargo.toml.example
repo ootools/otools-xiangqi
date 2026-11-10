@@ -1,0 +1,68 @@
+# OTools 插件外壳（Rust+WASM+egui）模板。
+#
+# 这是「移植别的软件」的最小可编译骨架。把它**重命名为 Cargo.toml** 即可用
+# `trunk build --release` 编译出一个最小 egui 插件（src/main.rs 里的 PluginApp）。
+#
+# 移植真实 egui 软件时：
+#   1. 在下面加 path 依赖指向 ../upstream/...（见末尾示例）。
+#   2. 把 src/main.rs 里 `PluginApp::update` 换成你上游 App 的 UI（或 new 一个你的 App 类型）。
+#   3. 若上游的同步文件 read/write 在 wasm 下报错，按 shell/patches/README.md 打补丁
+#      把 I/O 接到 `otools::` 桥。
+[package]
+name = "otools-plugin-shell"
+description = "OTools plugin shell: a Rust+WASM+egui app with the OTools host file I/O bridge"
+version = "0.1.0"
+edition = "2024"
+license = "MIT OR Apache-2.0"
+publish = false
+
+# 独立的 workspace：上游 upstream/ 有自己的 workspace，本 crate 不能并进去
+# （它是 wasm-only 的，并进去会让宿主的 cargo build 也去编译 eframe/wgpu）。
+[workspace]
+
+[[bin]]
+name = "otools-plugin"
+path = "src/main.rs"
+
+[dependencies]
+egui = { version = "0.36", default-features = false }
+eframe = { version = "0.36", default-features = false, features = ["persistence", "default_fonts", "wgpu", "accesskit"] }
+wasm-bindgen = "0.2"
+wasm-bindgen-futures = "0.4"
+js-sys = "0.3"
+base64 = "0.22"
+log = { version = "0.4", default-features = false }
+serde_json = { version = "1", features = ["float_roundtrip"] }
+
+# 只在 wasm 下需要的依赖（宿主/桌面下本 crate 什么都不做）
+[target.'cfg(target_arch = "wasm32")'.dependencies.web-sys]
+version = "0.3"
+features = [
+  "Blob",
+  "BlobPropertyBag",
+  "Document",
+  "Element",
+  "EventTarget",
+  "File",
+  "FileList",
+  "HtmlAnchorElement",
+  "HtmlCanvasElement",
+  "HtmlElement",
+  "HtmlInputElement",
+  "Location",
+  "MediaQueryList",
+  "Navigator",
+  "Url",
+  "UrlSearchParams",
+  "Window",
+]
+
+# —— 移植真实上游时，解除注释并改成你的上游 crate 路径 ——
+# [dependencies]
+# your-upstream-ui = { path = "../upstream/crates/ui" }
+# your-upstream-engine = { path = "../upstream/crates/engine" }
+
+[profile.release]
+opt-level = 3
+lto = "thin"
+codegen-units = 16

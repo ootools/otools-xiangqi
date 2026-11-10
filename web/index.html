@@ -1,0 +1,189 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+  <title>My OTools Plugin</title>
+  <link rel="icon" type="image/svg+xml" href="../logo.svg">
+  <style>
+    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1b1d22; color: #e6e6e6;
+      font: 14px/1.6 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
+    .wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; box-sizing: border-box; }
+    h1 { margin: 0; font-size: 20px; font-weight: 600; }
+    p.tip { margin: 0; color: #9aa0a6; max-width: 520px; text-align: center; }
+    .row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
+    button { background: #3b3f47; color: #e6e6e6; border: 1px solid #4a4f57; border-radius: 8px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
+    button:hover { background: #454a53; }
+    pre { background: #14161a; border: 1px solid #2a2d33; border-radius: 8px; padding: 12px 16px; max-width: 560px; max-height: 200px; overflow: auto; white-space: pre-wrap; word-break: break-all; margin: 0; }
+    .state { color: #7ee787; }
+    .state.bad { color: #ff7b72; }
+  </style>
+  <script>
+    /*
+     * OTools 宿主桥（插件唯一需要写的 JS）。
+     * ------------------------------------------------------------------
+     * 宿主注入了两条能力通道，任一条通就算「在 OTools 里」：
+     *   1. `window.otools` / `window.utools`：宿主包装 API（dialog.open/save + readHostFile/writeHostFile）。
+     *   2. `window.__TAURI_INTERNALS__.invoke`：Tauri 原生 IPC（tools_webview_* 命令）。
+     * 两条都不通（把 dist 拖进普通浏览器）就退回浏览器原生行为。
+     *
+     * 这是「用户开发新插件」的最小可用示例：弹宿主文件对话框、读文件、写文件。
+     * 移植 Rust+WASM 软件时，这段桥通常写在 shell/index.html，Rust 侧通过 wasm-bindgen
+     * 调这里（见 shell/src/otools.rs）。
+     */
+    (function () {
+      function base64ToBytes(b64) {
+        var bin = atob(b64);
+        var bytes = new Uint8Array(bin.length);
+        for (var i = 0; i < bin.length; i++) bytes[i] = bin.charCodeAt(i);
+        return bytes;
+      }
+      function bytesToBase64(bytes) {
+        var bin = '';
+        for (var i = 0; i < bytes.length; i++) bin += String.fromCharCode(bytes[i]);
+        return btoa(bin);
+      }
+      function baseName(p) {
+        var s = String(p || '');
+        var i = Math.max(s.lastIndexOf('/'), s.lastIndexOf('\\'));
+        return i >= 0 ? s.slice(i + 1) : s;
+      }
+
+      function wrapper() {
+        var a = (typeof window !== 'undefined' && (window.otools || window.utools)) || null;
+        return a && a.dialog && typeof a.dialog.open === 'function' && typeof a.readHostFile === 'function' ? a : null;
+      }
+      function tauriInvoke() {
+        var candidates = [window];
+        try { if (window.parent && window.parent !== window) candidates.push(window.parent); } catch (e) {}
+        try { if (window.top && window.top !== window) candidates.push(window.top); } catch (e) {}
+        for (var i = 0; i < candidates.length; i++) {
+          var t = candidates[i] && candidates[i].__TAURI_INTERNALS__;
+          if (t && typeof t.invoke === 'function') return t.invoke.bind(t);
+        }
+        return null;
+      }
+      function hostReady() { return !!wrapper() || !!tauriInvoke(); }
+      function fail(msg) { return Promise.reject(new Error(msg)); }
+
+      function readHostFile(path) {
+        var a = wrapper();
+        if (a) return a.readHostFile(path);
+        var invoke = tauriInvoke();
+        if (!invoke) return fail('OTools 宿主不可用');
+        return invoke('tools_webview_read_file', { path: path });
+      }
+      function writeHostFile(path, dataBase64) {
+        var invoke = tauriInvoke();
+        if (invoke) {
+          return invoke('tools_webview_write_file', { request: { path: path, dataBase64: dataBase64 } }).catch(function (e) {
+            var a = wrapper();
+            if (a && typeof a.writeHostFile === 'function') return a.writeHostFile({ path: path, dataBase64: dataBase64 });
+            throw e;
+          });
+        }
+        var a = wrapper();
+        if (a && typeof a.writeHostFile === 'function') return a.writeHostFile({ path: path, dataBase64: dataBase64 });
+        return fail('OTools 宿主不可用');
+      }
+      function pickOpenPath(filters) {
+        var a = wrapper();
+        if (a) return a.dialog.open({ directory: false, multiple: false, title: '打开文件', filters: filters }).then(function (p) {
+          return (p && typeof p === 'string') ? p : (p && p.path ? p.path : null);
+        });
+        var invoke = tauriInvoke();
+        if (!invoke) return fail('OTools 打开文件对话框不可用');
+        return invoke('tools_webview_pick_files', { options: { multiple: false, title: '打开文件', filters: filters } }).then(function (files) {
+          var list = Array.isArray(files) ? files : (files ? [files] : []);
+          var first = list[0];
+          return first ? (typeof first === 'string' ? first : (first.path || null)) : null;
+        });
+      }
+      function pickSavePath(defaultPath) {
+        var a = wrapper();
+        if (a) return a.dialog.save({ title: '保存文件', defaultPath: defaultPath, filters: [{ name: '文本', extensions: ['txt'] }] }).then(function (p) {
+          return (p && typeof p === 'string') ? p : (p && p.path ? p.path : null);
+        });
+        var invoke = tauriInvoke();
+        if (!invoke) return fail('OTools 保存对话框不可用');
+        var sp = String(defaultPath || '').match(/^(.*[\\/])?([^\\/]+)$/);
+        return invoke('tools_webview_pick_save_path', {
+          options: { title: '保存文件', suggestedName: sp ? sp[2] : defaultPath, directory: sp ? sp[1].replace(/[\\/]+$/, '') : undefined, filters: [{ name: '文本', extensions: ['txt'] }] },
+        }).then(function (meta) { return meta ? (typeof meta === 'string' ? meta : (meta.path || null)) : null; });
+      }
+
+      // 暴露给页面其它脚本（也暴露给 WASM 侧）的统一桥。
+      window.otoolsPlugin = {
+        available: function () { return hostReady(); },
+        theme: function () {
+          var cl = document.documentElement && document.documentElement.classList;
+          if (!cl) return '';
+          if (cl.contains('dark')) return 'dark';
+          if (cl.contains('light')) return 'light';
+          return '';
+        },
+        language: function () {
+          try {
+            return (window.__OTOOLS_LOCALE__ && window.__OTOOLS_LOCALE__.locale) ||
+              (document.documentElement && document.documentElement.lang) ||
+              (typeof navigator !== 'undefined' && navigator.language) || '';
+          } catch (e) { return ''; }
+        },
+        openText: function (filters) {
+          if (!hostReady()) return fail('OTools 打开文件对话框不可用');
+          return pickOpenPath(filters || [{ name: '文本', extensions: ['txt', 'json', 'md'] }]).then(function (path) {
+            if (!path) return null;
+            return readHostFile(path).then(function (file) {
+              var dataBase64 = (file && file.dataBase64) || '';
+              return { name: (file && file.name) || baseName(path), path: path, text: atob(dataBase64) };
+            });
+          });
+        },
+        saveText: function (name, text) {
+          if (!hostReady()) return fail('OTools 保存对话框不可用');
+          return pickSavePath(name).then(function (path) {
+            if (!path) return null;
+            return writeHostFile(path, bytesToBase64(new TextEncoder().encode(text))).then(function () { return path; });
+          });
+        },
+      };
+
+      // ---- 下面只是示例 UI，演示怎么用上面的桥；删掉换成你自己的应用即可 ----
+      function setState(msg, bad) {
+        var el = document.getElementById('state');
+        el.textContent = msg;
+        el.className = 'state' + (bad ? ' bad' : '');
+      }
+      window.addEventListener('DOMContentLoaded', function () {
+        document.getElementById('open').addEventListener('click', function () {
+          window.otoolsPlugin.openText().then(function (r) {
+            if (!r) { setState('已取消'); return; }
+            document.getElementById('out').textContent = r.text;
+            setState('已打开：' + r.path);
+          }).catch(function (e) { setState('打开失败：' + e.message, true); });
+        });
+        document.getElementById('save').addEventListener('click', function () {
+          var text = document.getElementById('out').textContent || '';
+          window.otoolsPlugin.saveText('hello.txt', text).then(function (p) {
+            if (!p) { setState('已取消'); return; }
+            setState('已保存：' + p);
+          }).catch(function (e) { setState('保存失败：' + e.message, true); });
+        });
+        setState(window.otoolsPlugin.available() ? '运行在 OTools 宿主中' : '未检测到宿主（退回浏览器行为）');
+      });
+    })();
+  </script>
+</head>
+<body>
+  <div class="wrap">
+    <h1>My OTools Plugin</h1>
+    <p class="tip">这是 OTools 插件模板的最小示例：用宿主的文件对话框读写真实磁盘文件，无需任何前端打包步骤。把这段逻辑换成你的应用即可。</p>
+    <div class="row">
+      <button id="open">打开文件</button>
+      <button id="save">保存为…</button>
+    </div>
+    <pre id="out">在这里显示打开的文件内容…</pre>
+    <div id="state" class="state"></div>
+  </div>
+</body>
+</html>

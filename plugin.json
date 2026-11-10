@@ -1,0 +1,21 @@
+{
+  "devUrl": "http://127.0.0.1:6482",
+  "developerName": "your-name",
+  "displayName": "My Plugin",
+  "displayNameCN": "我的插件",
+  "entry": "dist/index.html",
+  "quickDev": true,
+  "hasAd": false,
+  "icon": "🧩",
+  "inPluginPurchase": false,
+  "key": [
+    "my-plugin",
+    "插件"
+  ],
+  "openInBrowser": false,
+  "packid": "otools-my-plugin",
+  "screenshots": [],
+  "summary": "一句话描述这个插件做了什么（会展示在插件市场卡片上）。",
+  "uuid": "otools-my-plugin",
+  "version": "0.1.0"
+}
