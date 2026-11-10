@@ -10,3 +10,5 @@ shell/Cargo.lock
 dist-pack/
 node_modules/
 *.log
+
+.DS_Store

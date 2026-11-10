@@ -3,21 +3,9 @@
 <head>
   <meta charset="utf-8">
   <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
-  <title>My OTools Plugin</title>
-  <link rel="icon" type="image/svg+xml" href="../logo.svg">
-  <style>
-    html, body { margin: 0; padding: 0; width: 100%; height: 100%; overflow: hidden; background: #1b1d22; color: #e6e6e6;
-      font: 14px/1.6 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif; }
-    .wrap { position: absolute; inset: 0; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 16px; padding: 24px; box-sizing: border-box; }
-    h1 { margin: 0; font-size: 20px; font-weight: 600; }
-    p.tip { margin: 0; color: #9aa0a6; max-width: 520px; text-align: center; }
-    .row { display: flex; gap: 12px; flex-wrap: wrap; justify-content: center; }
-    button { background: #3b3f47; color: #e6e6e6; border: 1px solid #4a4f57; border-radius: 8px; padding: 8px 16px; font-size: 14px; cursor: pointer; }
-    button:hover { background: #454a53; }
-    pre { background: #14161a; border: 1px solid #2a2d33; border-radius: 8px; padding: 12px 16px; max-width: 560px; max-height: 200px; overflow: auto; white-space: pre-wrap; word-break: break-all; margin: 0; }
-    .state { color: #7ee787; }
-    .state.bad { color: #ff7b72; }
-  </style>
+  <title>中国象棋 · OTools 插件</title>
+  <link rel="icon" type="image/svg+xml" href="logo.svg">
+  <link rel="stylesheet" href="css/style.css">
   <script>
     /*
      * OTools 宿主桥（插件唯一需要写的 JS）。
@@ -27,9 +15,7 @@
      *   2. `window.__TAURI_INTERNALS__.invoke`：Tauri 原生 IPC（tools_webview_* 命令）。
      * 两条都不通（把 dist 拖进普通浏览器）就退回浏览器原生行为。
      *
-     * 这是「用户开发新插件」的最小可用示例：弹宿主文件对话框、读文件、写文件。
-     * 移植 Rust+WASM 软件时，这段桥通常写在 shell/index.html，Rust 侧通过 wasm-bindgen
-     * 调这里（见 shell/src/otools.rs）。
+     * 本插件用它做棋谱 JSON / FEN 的导入（openText）与导出（saveText）。
      */
     (function () {
       function base64ToBytes(b64) {
@@ -101,18 +87,18 @@
       }
       function pickSavePath(defaultPath) {
         var a = wrapper();
-        if (a) return a.dialog.save({ title: '保存文件', defaultPath: defaultPath, filters: [{ name: '文本', extensions: ['txt'] }] }).then(function (p) {
+        if (a) return a.dialog.save({ title: '保存文件', defaultPath: defaultPath, filters: [{ name: '棋谱', extensions: ['json'] }] }).then(function (p) {
           return (p && typeof p === 'string') ? p : (p && p.path ? p.path : null);
         });
         var invoke = tauriInvoke();
         if (!invoke) return fail('OTools 保存对话框不可用');
         var sp = String(defaultPath || '').match(/^(.*[\\/])?([^\\/]+)$/);
         return invoke('tools_webview_pick_save_path', {
-          options: { title: '保存文件', suggestedName: sp ? sp[2] : defaultPath, directory: sp ? sp[1].replace(/[\\/]+$/, '') : undefined, filters: [{ name: '文本', extensions: ['txt'] }] },
+          options: { title: '保存文件', suggestedName: sp ? sp[2] : defaultPath, directory: sp ? sp[1].replace(/[\\/]+$/, '') : undefined, filters: [{ name: '棋谱', extensions: ['json'] }] },
         }).then(function (meta) { return meta ? (typeof meta === 'string' ? meta : (meta.path || null)) : null; });
       }
 
-      // 暴露给页面其它脚本（也暴露给 WASM 侧）的统一桥。
+      // 暴露给页面其它脚本的统一桥。
       window.otoolsPlugin = {
         available: function () { return hostReady(); },
         theme: function () {
@@ -147,43 +133,86 @@
           });
         },
       };
-
-      // ---- 下面只是示例 UI，演示怎么用上面的桥；删掉换成你自己的应用即可 ----
-      function setState(msg, bad) {
-        var el = document.getElementById('state');
-        el.textContent = msg;
-        el.className = 'state' + (bad ? ' bad' : '');
-      }
-      window.addEventListener('DOMContentLoaded', function () {
-        document.getElementById('open').addEventListener('click', function () {
-          window.otoolsPlugin.openText().then(function (r) {
-            if (!r) { setState('已取消'); return; }
-            document.getElementById('out').textContent = r.text;
-            setState('已打开：' + r.path);
-          }).catch(function (e) { setState('打开失败：' + e.message, true); });
-        });
-        document.getElementById('save').addEventListener('click', function () {
-          var text = document.getElementById('out').textContent || '';
-          window.otoolsPlugin.saveText('hello.txt', text).then(function (p) {
-            if (!p) { setState('已取消'); return; }
-            setState('已保存：' + p);
-          }).catch(function (e) { setState('保存失败：' + e.message, true); });
-        });
-        setState(window.otoolsPlugin.available() ? '运行在 OTools 宿主中' : '未检测到宿主（退回浏览器行为）');
-      });
     })();
   </script>
 </head>
 <body>
-  <div class="wrap">
-    <h1>My OTools Plugin</h1>
-    <p class="tip">这是 OTools 插件模板的最小示例：用宿主的文件对话框读写真实磁盘文件，无需任何前端打包步骤。把这段逻辑换成你的应用即可。</p>
-    <div class="row">
-      <button id="open">打开文件</button>
-      <button id="save">保存为…</button>
+  <header class="app-header">
+    <div class="brand">
+      <img class="brand-logo" src="logo.svg" alt="">
+      <h1>中国象棋</h1>
     </div>
-    <pre id="out">在这里显示打开的文件内容…</pre>
-    <div id="state" class="state"></div>
-  </div>
+    <nav class="tabs" id="tabs">
+      <button class="tab active" data-tab="play">对弈</button>
+      <button class="tab" data-tab="replay">排盘</button>
+      <button class="tab" data-tab="edit">摆盘</button>
+    </nav>
+  </header>
+
+  <main class="layout">
+    <section class="board-area">
+      <div class="board-wrap" id="boardWrap">
+        <canvas id="board"></canvas>
+      </div>
+    </section>
+
+    <aside class="panel">
+      <!-- 对弈 -->
+      <div class="panel-page active" id="panel-play">
+        <div class="status-card" id="playStatus">红方行棋</div>
+        <div class="btn-row">
+          <button id="btnUndo">悔棋</button>
+          <button id="btnRestart">重新开始</button>
+        </div>
+        <div class="btn-row">
+          <button id="btnImportGame">导入棋谱</button>
+          <button id="btnExportGame">导出对局</button>
+        </div>
+        <div class="move-list" id="playMoveList"></div>
+        <div class="hint">点击己方棋子后点击高亮落点走子；对局进度自动保存。</div>
+      </div>
+
+      <!-- 排盘 -->
+      <div class="panel-page" id="panel-replay">
+        <div class="status-card" id="replayStatus">选择一局名局开始打谱</div>
+        <div class="game-list" id="gameList"></div>
+        <div class="btn-row">
+          <button id="rpFirst" title="回到初始">⏮ 首</button>
+          <button id="rpPrev">上一</button>
+          <button id="rpNext">下一</button>
+          <button id="rpLast" title="到最后">末 ⏭</button>
+          <button id="rpPlay">▶ 自动</button>
+          <select id="rpSpeed" title="自动播放速度">
+            <option value="2200">慢</option>
+            <option value="1200" selected>中</option>
+            <option value="500">快</option>
+          </select>
+        </div>
+        <div class="move-list clickable" id="replayMoveList"></div>
+        <div class="comment-box" id="replayComment">评注会显示在这里。</div>
+      </div>
+
+      <!-- 摆盘 -->
+      <div class="panel-page" id="panel-edit">
+        <div class="status-card" id="editStatus">选择棋子后点击棋盘放置；点击已有棋子可替换。</div>
+        <div class="palette" id="palette"></div>
+        <div class="btn-row">
+          <button id="edClear">清空</button>
+          <button id="edInitial">初始局面</button>
+          <button id="edStart">从此局面开始对弈</button>
+        </div>
+        <div class="btn-row">
+          <button id="edImportFen">导入 FEN</button>
+          <button id="edCopyFen">复制当前 FEN</button>
+        </div>
+        <div class="fen-box" id="fenBox"></div>
+        <div class="hint">校验项：双方有王且在九宫、无照面、士相立足点、兵不过后场、子力数量上限。</div>
+      </div>
+    </aside>
+  </main>
+
+  <div id="toast" class="toast" hidden></div>
+  <input type="file" id="fileInput" accept=".json,application/json" hidden>
+  <script type="module" src="js/ui/app.js"></script>
 </body>
 </html>

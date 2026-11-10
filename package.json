@@ -1,0 +1,11 @@
+{
+  "name": "otools-xiangqi",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "OTools 插件：中国象棋（双人对弈 + 名局排盘 + 自由摆盘，纯静态实现）",
+  "scripts": {
+    "test": "node --test tests/",
+    "build": "node scripts/build-web.mjs"
+  }
+}

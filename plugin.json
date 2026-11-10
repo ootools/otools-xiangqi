@@ -1,21 +1,26 @@
 {
-  "devUrl": "http://127.0.0.1:6482",
-  "developerName": "your-name",
-  "displayName": "My Plugin",
-  "displayNameCN": "我的插件",
+  "uuid": "otools-xiangqi",
+  "packid": "otools-xiangqi",
+  "displayName": "Xiangqi",
+  "displayNameCN": "中国象棋",
+  "developerName": "OTools",
+  "summary": "双人对弈 + 名局棋谱排盘 + 自由摆盘，内置完整规则引擎的桌面象棋。",
+  "version": "0.1.0",
   "entry": "dist/index.html",
+  "devUrl": "http://127.0.0.1:6541",
   "quickDev": true,
   "hasAd": false,
-  "icon": "🧩",
   "inPluginPurchase": false,
-  "key": [
-    "my-plugin",
-    "插件"
-  ],
   "openInBrowser": false,
-  "packid": "otools-my-plugin",
+  "logo": "logo.svg",
+  "icon": "♟️",
   "screenshots": [],
-  "summary": "一句话描述这个插件做了什么（会展示在插件市场卡片上）。",
-  "uuid": "otools-my-plugin",
-  "version": "0.1.0"
+  "key": [
+    "象棋",
+    "棋谱",
+    "排盘",
+    "对弈",
+    "xiangqi",
+    "chinese chess"
+  ]
 }

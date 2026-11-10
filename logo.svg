@@ -1,14 +1,46 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="Plugin">
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 128 128" width="128" height="128" role="img" aria-label="中国象棋">
   <defs>
-    <linearGradient id="bg-plugin" x1="0%" y1="0%" x2="100%" y2="100%">
-      <stop offset="0%" stop-color="#4f46e5"/>
-      <stop offset="100%" stop-color="#0ea5e9"/>
+    <linearGradient id="xq-bg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#2b2115"/>
+      <stop offset="100%" stop-color="#171310"/>
+    </linearGradient>
+    <radialGradient id="xq-disc" cx="35%" cy="30%" r="80%">
+      <stop offset="0%" stop-color="#f7ecd4"/>
+      <stop offset="100%" stop-color="#d9bd8c"/>
+    </radialGradient>
+    <linearGradient id="xq-disc2" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#e3d6bb"/>
+      <stop offset="100%" stop-color="#b9a276"/>
     </linearGradient>
   </defs>
-  <rect width="128" height="128" rx="28" fill="url(#bg-plugin)"/>
-  <g fill="none" stroke="#fff" stroke-width="7" stroke-linejoin="round" stroke-linecap="round">
-    <!-- 拼图块轮廓：替换成你的插件图标 -->
-    <path d="M40 34 h26 a10 10 0 0 1 20 0 h6 a10 10 0 0 1 10 10 v22 a12 12 0 0 0 12 12 a12 12 0 0 0 -12 12 v6 a10 10 0 0 1 -10 10 h-6 a10 10 0 0 1 -20 0 h-26 a10 10 0 0 1 -10 -10 v-52 a10 10 0 0 1 10 -10 z"/>
-    <circle cx="64" cy="58" r="9" fill="#fff" stroke="none"/>
+
+  <rect width="128" height="128" rx="26" fill="url(#xq-bg)"/>
+
+  <!-- 棋盘经纬线示意 -->
+  <g stroke="#8a6f45" stroke-width="2" opacity="0.5">
+    <line x1="18" y1="40" x2="110" y2="40"/>
+    <line x1="18" y1="104" x2="110" y2="104"/>
+    <line x1="24" y1="22" x2="24" y2="40"/>
+    <line x1="104" y1="22" x2="104" y2="40"/>
+    <line x1="24" y1="104" x2="24" y2="122"/>
+    <line x1="104" y1="104" x2="104" y2="122"/>
+  </g>
+
+  <!-- 黑棋（后景） -->
+  <g>
+    <circle cx="88" cy="84" r="26" fill="url(#xq-disc2)" stroke="#8f7c56" stroke-width="3"/>
+    <circle cx="88" cy="84" r="20" fill="none" stroke="#5c4d33" stroke-width="2" opacity="0.7"/>
+    <text x="88" y="86" text-anchor="middle" dominant-baseline="central"
+          font-family="Kaiti SC, STKaiti, KaiTi, SimKai, serif" font-size="24" font-weight="bold"
+          fill="#2f2c26">卒</text>
+  </g>
+
+  <!-- 红棋（主景） -->
+  <g>
+    <circle cx="50" cy="52" r="34" fill="url(#xq-disc)" stroke="#a8894f" stroke-width="4"/>
+    <circle cx="50" cy="52" r="26" fill="none" stroke="#b83227" stroke-width="2.5" opacity="0.8"/>
+    <text x="50" y="54" text-anchor="middle" dominant-baseline="central"
+          font-family="Kaiti SC, STKaiti, KaiTi, SimKai, serif" font-size="34" font-weight="bold"
+          fill="#b83227">帅</text>
   </g>
 </svg>

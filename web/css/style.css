@@ -1,0 +1,222 @@
+/* OTools · 中国象棋 —— 深色主题 */
+:root {
+  --bg: #1b1d22;
+  --bg-panel: #23262c;
+  --bg-card: #2a2d34;
+  --border: #3a3e47;
+  --text: #e6e6e6;
+  --text-dim: #9aa0a6;
+  --gold: #d9a441;
+  --gold-dim: #b8862f;
+  --red: #e05d5d;
+  --green: #7ee787;
+}
+
+* { box-sizing: border-box; }
+
+html, body {
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: var(--bg);
+  color: var(--text);
+  font: 14px/1.6 system-ui, -apple-system, "PingFang SC", "Microsoft YaHei", sans-serif;
+}
+
+body { display: flex; flex-direction: column; }
+
+.app-header {
+  flex: none;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 18px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bg-panel);
+}
+
+.brand { display: flex; align-items: center; gap: 10px; }
+.brand-logo { width: 30px; height: 30px; }
+.brand h1 { margin: 0; font-size: 18px; font-weight: 600; letter-spacing: 2px; }
+
+.tabs { display: flex; gap: 8px; }
+.tab {
+  background: transparent;
+  color: var(--text-dim);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 6px 18px;
+  font-size: 14px;
+  cursor: pointer;
+}
+.tab:hover { color: var(--text); border-color: var(--gold-dim); }
+.tab.active { color: #1b1d22; background: var(--gold); border-color: var(--gold); font-weight: 600; }
+
+.layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 14px;
+  padding: 14px;
+}
+
+.board-area { flex: 1; display: flex; min-width: 0; }
+.board-wrap { flex: 1; position: relative; min-height: 0; }
+.board-wrap canvas { position: absolute; inset: 0; width: 100%; height: 100%; cursor: pointer; }
+
+.panel {
+  width: 340px;
+  flex-shrink: 0;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.panel-page { display: none; flex-direction: column; gap: 10px; height: 100%; min-height: 0; }
+.panel-page.active { display: flex; }
+
+.status-card {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 14px;
+  font-size: 14px;
+}
+.status-card.warn { border-color: var(--gold); color: var(--gold); }
+.status-card.bad { border-color: var(--red); color: var(--red); }
+.status-card.good { border-color: var(--green); color: var(--green); }
+
+.btn-row { display: flex; gap: 8px; flex-wrap: wrap; }
+button, .btn-row select {
+  background: #3b3f47;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 7px 12px;
+  font-size: 13px;
+  cursor: pointer;
+}
+button:hover { background: #454a53; border-color: #565c66; }
+button.primary { background: var(--gold); border-color: var(--gold); color: #1b1d22; font-weight: 600; }
+button.primary:hover { background: #e4b055; }
+button:disabled { opacity: 0.45; cursor: not-allowed; }
+
+.move-list {
+  flex: 1;
+  min-height: 0;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px 6px;
+  font-size: 13px;
+}
+.move-list.clickable .mv { cursor: pointer; }
+.move-row {
+  display: grid;
+  grid-template-columns: 34px 1fr 1fr;
+  padding: 3px 8px;
+  border-radius: 6px;
+  color: var(--text-dim);
+}
+.move-row > .no { color: #6b7078; }
+.move-row > .mv { color: var(--text); }
+.move-row > .mv.red { color: #ef9a9a; }
+.move-row > .mv.black { color: #cfd8dc; }
+.move-row.current { background: #3a3226; }
+.move-row.current > .no, .move-row.current > .mv { color: var(--gold); font-weight: 600; }
+.move-empty { color: var(--text-dim); text-align: center; padding: 12px 0; }
+
+.comment-box {
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 12px;
+  font-size: 13px;
+  color: var(--text-dim);
+  max-height: 110px;
+  overflow-y: auto;
+}
+
+.game-list {
+  max-height: 200px;
+  overflow-y: auto;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 6px;
+}
+.game-item { padding: 7px 10px; border-radius: 8px; cursor: pointer; }
+.game-item:hover { background: #34383f; }
+.game-item.active { background: #3a3226; }
+.game-item .g-title { font-size: 13px; color: var(--text); font-weight: 600; }
+.game-item .g-meta { font-size: 12px; color: var(--text-dim); }
+
+.palette {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 6px;
+  background: var(--bg-card);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 8px;
+}
+.piece-chip {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  aspect-ratio: 1;
+  border-radius: 50%;
+  border: 2px solid transparent;
+  font-family: "Kaiti SC", "STKaiti", "KaiTi", "SimKai", serif;
+  font-weight: 700;
+  font-size: 16px;
+  cursor: pointer;
+  user-select: none;
+}
+.piece-chip.red { background: #f3e6c8; color: #c0392b; box-shadow: inset 0 0 0 2px #d8b988; }
+.piece-chip.black { background: #e8e3d5; color: #2c2c2c; box-shadow: inset 0 0 0 2px #b7ad96; }
+.piece-chip.tool { background: #3b3f47; color: var(--text); font-size: 12px; box-shadow: none; border-radius: 8px; font-family: inherit; }
+.piece-chip.selected { border-color: var(--gold); box-shadow: 0 0 0 2px rgba(217, 164, 65, 0.4), inset 0 0 0 2px #d8b988; }
+
+.fen-box {
+  background: #14161a;
+  border: 1px solid var(--border);
+  border-radius: 8px;
+  padding: 8px 10px;
+  font-size: 12px;
+  color: var(--text-dim);
+  word-break: break-all;
+  max-height: 72px;
+  overflow-y: auto;
+  user-select: all;
+}
+
+.hint { font-size: 12px; color: var(--text-dim); }
+
+.toast {
+  position: fixed;
+  left: 50%;
+  bottom: 26px;
+  transform: translateX(-50%);
+  background: #2f3238;
+  color: var(--text);
+  border: 1px solid var(--border);
+  border-radius: 10px;
+  padding: 9px 18px;
+  font-size: 13px;
+  box-shadow: 0 6px 24px rgba(0, 0, 0, 0.5);
+  z-index: 99;
+  max-width: 70%;
+}
+.toast.bad { border-color: var(--red); color: #ffb4b4; }
+.toast.good { border-color: var(--green); color: #b8f0c0; }
+
+@media (max-width: 860px) {
+  .layout { flex-direction: column; overflow-y: auto; }
+  .panel { width: 100%; flex: none; }
+  .board-area { min-height: 420px; }
+  .move-list { max-height: 200px; }
+}
