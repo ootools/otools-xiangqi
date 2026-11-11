@@ -10,7 +10,7 @@ OTools 独立插件：中国象棋——双人对弈 + 名局棋谱排盘 + 自�
   "uuid": "otools-xiangqi", "packid": "otools-xiangqi",
   "displayName": "Xiangqi", "displayNameCN": "中国象棋",
   "developerName": "OTools", "summary": "双人对弈 + 名局棋谱排盘 + 自由摆盘，内置完整规则引擎的桌面象棋。",
-  "version": "0.1.0", "entry": "dist/index.html",
+  "version": "0.2.0", "entry": "dist/index.html",
   "devUrl": "http://127.0.0.1:6541", "quickDev": true, "hasAd": false,
   "inPluginPurchase": false, "openInBrowser": false,
   "logo": "logo.svg", "icon": "♟️", "screenshots": [],
@@ -57,3 +57,29 @@ OTools 独立插件：中国象棋——双人对弈 + 名局棋谱排盘 + 自�
 2. 内置棋谱逐步合法 + 覆盖每局元数据完整。
 3. 记谱：初始局面常见着法（炮二平五 H2-E2、马八进七 B0-C2 等）抽查。
 4. FEN 往返一致。
+
+## 电脑对弈（0.2.0）
+
+### AI 引擎 `web/js/engine/xiangqi-ai.js`
+
+- 纯函数、无 DOM 依赖，node --test 可直接 import；复用 `xiangqi.js` 的 `legalMoves`（走子生成 + 送将/照面合法性）、`pseudoMoves / applyMove / kingsFacing / isCheck`（静态搜索快速过滤）。
+- 对外 API：`chooseMove(board, side, { level })` → 引擎走法结构 `{from, to, piece, captured, score}`（无合法着法返回 null）；`AI_LEVELS` 导出三档参数；`evaluate` 导出便于调试。
+- 搜索：negamax + α-β 剪枝 + 迭代加深（时间预算内从深度 1 逐层加深，超时沿用上一层完成结果）；走法排序吃子优先（MVV-LVA，稳定排序保持生成顺序）；静态搜索只扩展吃子着法（≤3 层）抑制水平线效应；无合法着法节点按被将死/困毙打 `-(MATE - ply)` 分（快杀优于慢杀）。
+- 难度参数：`easy { timeMs: 200, maxDepth: 2 }`、`normal { timeMs: 500, maxDepth: 4 }`、`hard { timeMs: 900, maxDepth: 6 }`（hard 墙钟实测 <1.2s）。
+- 评估：子力（车900 炮450 马400 相/象200 士/仕200 兵100/过河200 帅10000）+ 轻量位置项（过河兵加分、车炮活动度按直线可达空格计、炮隔子可打目标、叶点被将军罚分）。同分按稳定顺序决胜（生成顺序 + 稳定排序），同局面同难度结果确定（测试选用搜索可在预算内完整完成的局面/档位组合，避免时间截断受机器速度影响）。
+- 棋力定位：入门级搜索 AI，无开局库/残局库，非引擎强度。
+
+### UI（对弈页签）
+
+- 对弈模式选择（双人 / 人机·玩家执红 / 人机·玩家执黑）+ 难度选择（易/中/难，仅人机模式显示），模式与难度随对局进度一并存入 localStorage。
+- 轮到 AI 时先渲染玩家落子，再 `setTimeout(50ms)` 后同步计算（计算前状态栏已显示「对手思考中…（红方/黑方（电脑） · 难度X）」并锁定棋盘输入）。
+- 人机模式悔棋一次撤 AI+玩家两步（撤到玩家上一次行棋之前）；重新开始/切换模式会取消待执行的 AI 思考；摆盘「从此局面开局」、导入棋谱后若轮到 AI 同样自动走人机流程（玩家执黑时 AI 红先）。
+
+### 测试（tests/xiangqi-ai.test.js，并入 tests/index.js）
+
+1. 必杀局找到将死一步（重炮演示局终局前局面，三档难度）。
+2. 白吃悬空头车（固定局面 `3k5/9/9/4r4/9/9/9/9/4R4/4K4 w` 断言 e1×e6，三档难度）。
+3. AI 自对弈 40 步全部合法（easy，makeMove 逐步校验）。
+4. 各档位在预算内返回合法着法（easy<400ms / normal<700ms / hard<1200ms 墙钟）。
+5. 同局面同难度两次结果一致（easy/normal 于初始局面、normal 于稀疏局面）。
+6. 将死局面无合法着法返回 null；AI_LEVELS 参数断言。

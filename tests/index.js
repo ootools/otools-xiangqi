@@ -8,3 +8,4 @@ import './rules.test.js';
 import './notation.test.js';
 import './fen.test.js';
 import './games.test.js';
+import './xiangqi-ai.test.js';

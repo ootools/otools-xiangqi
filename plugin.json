@@ -5,7 +5,7 @@
   "displayNameCN": "中国象棋",
   "developerName": "OTools",
   "summary": "双人对弈 + 名局棋谱排盘 + 自由摆盘，内置完整规则引擎的桌面象棋。",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "entry": "dist/index.html",
   "devUrl": "http://127.0.0.1:6541",
   "quickDev": true,

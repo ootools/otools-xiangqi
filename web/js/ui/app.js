@@ -4,8 +4,9 @@
 import {
   initialBoard, cloneBoard, legalMoves, makeMove, applyMove, gameStatus, isCheck,
   toFEN, fromFEN, toChineseNotation, parseIccs, positionKey, validateSetup,
-  colorOf, isRedSide, PIECES, findKing, replayMoves,
+  colorOf, isRedSide, opponentOf, PIECES, findKing, replayMoves, moveToIccs,
 } from '../engine/xiangqi.js';
+import { chooseMove } from '../engine/xiangqi-ai.js';
 import { GAMES } from '../../data/games/index.js';
 import { renderBoard, onBoardClick } from './board.js';
 
@@ -159,13 +160,39 @@ const play = {
   side: 'w',
   history: [], // {iccs, notation, fenBefore, side}
   over: false,
+  mode: 'pvp',        // 'pvp' 双人 | 'ai-red' 人机·玩家执红 | 'ai-black' 人机·玩家执黑
+  level: 'normal',    // AI 难度 easy / normal / hard
+  thinking: false,    // AI 正在思考（锁定棋盘输入）
+  aiTimer: null,      // AI 思考延时器
 };
+
+const INITIAL_FEN = 'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w';
+
+/** 人机模式下玩家执子；双人模式返回 null。 */
+function playerSide() {
+  if (play.mode === 'ai-red') return 'w';
+  if (play.mode === 'ai-black') return 'b';
+  return null;
+}
+
+/** 是否轮到电脑行棋（人机模式且非终局且当前行棋方不是玩家）。 */
+function isAiTurn() {
+  return play.mode !== 'pvp' && !play.over && play.side !== playerSide();
+}
+
+/** 取消待执行的 AI 思考（模式切换 / 重开 / 悔棋前调用）。 */
+function cancelAi() {
+  if (play.aiTimer) { clearTimeout(play.aiTimer); play.aiTimer = null; }
+  play.thinking = false;
+}
 
 function playSave() {
   try {
     localStorage.setItem(STORE_KEY, JSON.stringify({
       startFen: play.startFen,
       moves: play.history.map((h) => ({ iccs: h.iccs, notation: h.notation })),
+      mode: play.mode,
+      level: play.level,
       savedAt: Date.now(),
     }));
   } catch (e) { /* 存储不可用时静默 */ }
@@ -175,7 +202,7 @@ function playRestore() {
   let saved = null;
   try { saved = JSON.parse(localStorage.getItem(STORE_KEY) || 'null'); } catch (e) { saved = null; }
   if (!saved || !Array.isArray(saved.moves) || !saved.startFen) return false;
-  const isInitialFen = saved.startFen === 'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w';
+  const isInitialFen = saved.startFen === INITIAL_FEN;
   let board;
   try { board = fromFEN(saved.startFen).board; } catch (e) { return false; }
   let side = 'w';
@@ -191,6 +218,8 @@ function playRestore() {
   play.board = board;
   play.side = side;
   play.over = gameStatus(board, side).over;
+  play.mode = ['pvp', 'ai-red', 'ai-black'].includes(saved.mode) ? saved.mode : 'pvp';
+  play.level = ['easy', 'normal', 'hard'].includes(saved.level) ? saved.level : 'normal';
   return play.history.length > 0 || !isInitialFen;
 }
 
@@ -231,6 +260,12 @@ function renderPlayMoves() {
 
 function playUpdateStatus() {
   const el = $('playStatus');
+  if (play.thinking) {
+    const aiName = isRedSide(play.side) ? '红方（电脑）' : '黑方（电脑）';
+    const levelName = { easy: '易', normal: '中', hard: '难' }[play.level] || '中';
+    setStatus(el, `对手思考中…（${aiName} · 难度${levelName}），棋盘已锁定`, 'warn');
+    return;
+  }
   if (play.over) {
     const st = gameStatus(play.board, play.side);
     const loser = isRedSide(play.side) ? '红方' : '黑方';
@@ -271,38 +306,68 @@ function playRefresh(extras = {}) {
   renderPlayMoves();
   playUpdateStatus();
   playSave();
+  scheduleAi(); // 轮到电脑则先渲染当前局面，随后延时计算
+}
+
+// ---------------------------------------------------------------- 电脑对弈
+
+/**
+ * AI 思考调度：先渲染玩家落子（playRefresh 已完成），setTimeout(~50ms) 后
+ * 同步计算选点（阻塞窗口内状态栏已显示“对手思考中…”）。
+ */
+function scheduleAi() {
+  cancelAi();
+  if (!isAiTurn()) return;
+  play.thinking = true;
+  playUpdateStatus(); // 立即显示思考中并锁定棋盘
+  play.aiTimer = setTimeout(() => {
+    play.aiTimer = null;
+    if (!isAiTurn()) { play.thinking = false; playRefresh(); return; }
+    const move = chooseMove(play.board, play.side, { level: play.level });
+    play.thinking = false;
+    if (!move) {
+      // 无合法着法（将死/困毙）：判 AI 方负
+      play.over = true;
+      playRefresh();
+      return;
+    }
+    applyPlayMove(move.from, move.to);
+  }, 50);
+}
+
+/** 落子（玩家与 AI 共用）：推进局面、记谱、终局/将军提示。 */
+function applyPlayMove(from, to) {
+  const notation = toChineseNotation(play.board, play.side, from, to);
+  const record = {
+    iccs: moveToIccs(from, to),
+    notation,
+    fenBefore: toFEN(play.board, play.side),
+    side: play.side,
+    from, to,
+  };
+  play.board = makeMove(play.board, play.side, from, to);
+  play.side = opponentOf(play.side);
+  play.history.push(record);
+  const st = gameStatus(play.board, play.side);
+  play.over = st.over;
+  playRefresh();
+  if (st.over) {
+    const loser = isRedSide(play.side) ? '红方' : '黑方';
+    const winner = isRedSide(play.side) ? '黑方' : '红方';
+    toast(st.reason === 'checkmate' ? `将死！${winner}获胜` : `困毙！${winner}获胜`, 'good');
+  } else if (st.inCheck) {
+    toast('将军！');
+  }
 }
 
 handlers.play = (point) => {
+  if (play.thinking || isAiTurn()) return; // AI 回合 / 思考中：锁定棋盘输入
   if (play.over) { toast('对局已结束，请重新开始'); return; }
   const piece = play.board[point.r][point.c];
   const mine = piece && colorOf(piece) === play.side;
 
   if (view.selected && view.targets.some((t) => t.r === point.r && t.c === point.c)) {
-    // 走子
-    const from = view.selected;
-    const notation = toChineseNotation(play.board, play.side, from, point);
-    const pieceMoving = play.board[from.r][from.c];
-    const record = {
-      iccs: `${'abcdefghi'[from.c].toUpperCase()}${from.r}-${'abcdefghi'[point.c].toUpperCase()}${point.r}`,
-      notation,
-      fenBefore: toFEN(play.board, play.side),
-      side: play.side,
-      from, to: point,
-    };
-    play.board = makeMove(play.board, play.side, from, point);
-    play.side = play.side === 'w' ? 'b' : 'w';
-    play.history.push(record);
-    const st = gameStatus(play.board, play.side);
-    play.over = st.over;
-    playRefresh();
-    if (st.over) {
-      const loser = isRedSide(play.side) ? '红方' : '黑方';
-      const winner = isRedSide(play.side) ? '黑方' : '红方';
-      toast(st.reason === 'checkmate' ? `将死！${winner}获胜` : `困毙！${winner}获胜`, 'good');
-    } else if (st.inCheck) {
-      toast('将军！');
-    }
+    applyPlayMove(view.selected, point);
     return;
   }
 
@@ -324,25 +389,60 @@ handlers.play = (point) => {
 };
 
 $('btnUndo').addEventListener('click', () => {
+  if (play.thinking) { toast('对手思考中，请稍候'); return; }
   if (play.history.length === 0) { toast('没有可悔的棋'); return; }
-  const last = play.history.pop();
-  const { board, side } = fromFEN(last.fenBefore);
-  play.board = board;
-  play.side = side;
-  play.over = gameStatus(board, side).over;
+  if (play.mode === 'pvp') {
+    const last = play.history.pop();
+    const { board, side } = fromFEN(last.fenBefore);
+    play.board = board;
+    play.side = side;
+  } else {
+    // 人机模式：一次撤到玩家上一次行棋之前（正常撤 AI+玩家两步）
+    const mine = playerSide();
+    if (!play.history.some((h) => h.side === mine)) { toast('没有可悔的棋'); return; }
+    do {
+      const last = play.history.pop();
+      const { board, side } = fromFEN(last.fenBefore);
+      play.board = board;
+      play.side = side;
+    } while (play.side !== mine && play.history.length > 0);
+  }
+  play.over = gameStatus(play.board, play.side).over;
   playRefresh();
   toast('已悔一着');
 });
 
 $('btnRestart').addEventListener('click', () => {
-  play.board = play.startFen && play.startFen !== 'rnbakabnr/9/1c5c1/p1p1p1p1p/9/9/P1P1P1P1P/1C5C1/9/RNBAKABNR w'
-    ? fromFEN(play.startFen).board
-    : initialBoard();
+  cancelAi();
+  play.board = play.startFen && play.startFen !== INITIAL_FEN ? fromFEN(play.startFen).board : initialBoard();
   play.side = 'w';
   play.history = [];
   play.over = false;
   playRefresh();
   toast('新的一局开始，红方先行', 'good');
+});
+
+// 模式 / 难度选择
+function syncModeControls() {
+  $('playMode').value = play.mode;
+  $('playLevel').value = play.level;
+  $('playLevel').hidden = play.mode === 'pvp'; // 难度仅人机模式显示
+}
+
+$('playMode').addEventListener('change', () => {
+  cancelAi();
+  play.mode = $('playMode').value;
+  syncModeControls();
+  playRefresh();
+  toast(play.mode === 'pvp'
+    ? '已切换：双人对弈'
+    : play.mode === 'ai-red' ? '已切换：人机对弈，您执红先行' : '已切换：人机对弈，电脑执红先行');
+});
+
+$('playLevel').addEventListener('change', () => {
+  play.level = $('playLevel').value;
+  playSave();
+  toast(`电脑难度：${{ easy: '易', normal: '中', hard: '难' }[play.level]}`);
 });
 
 $('btnExportGame').addEventListener('click', () => {
@@ -632,9 +732,11 @@ renderPalette();
 editRefresh();
 
 if (playRestore()) {
+  syncModeControls();
   playRefresh();
   toast('已恢复上次对局进度', 'good');
 } else {
+  syncModeControls();
   playRefresh();
 }
 replayLoad(GAMES[0] && GAMES[0].id);
