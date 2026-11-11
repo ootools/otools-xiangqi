@@ -30,6 +30,21 @@ test('market payload uses actual packageUrl and a renderable raw logo field',()=
   // logo 必须走 raw.githubusercontent.com：Release 资产链是 octet-stream+attachment，<img> 拒载
   assert.equal(p.logo,'https://raw.githubusercontent.com/owner/repo/v1.0.0/logo.svg');
 });
+test('market payload defaults an omitted release version to the manifest version',()=>{
+  const p=marketPayload({packid:'plugin-a',version:'1.0.0',entry:'dist/index.html'},'owner/repo','plugin-plugin-a-v1.0.0');
+  assert.equal(p.version,'1.0.0');
+  assert.equal(p.packageUrl,'https://github.com/owner/repo/releases/download/plugin-plugin-a-v1.0.0/plugin-a-1.0.0.oplg');
+});
+test('market payload defaults an empty release version to the manifest version',()=>{
+  const p=marketPayload({packid:'plugin-a',version:'1.0.0',entry:'dist/index.html'},'owner/repo','plugin-plugin-a-v1.0.0','');
+  assert.equal(p.version,'1.0.0');
+  assert.equal(p.packageUrl,'https://github.com/owner/repo/releases/download/plugin-plugin-a-v1.0.0/plugin-a-1.0.0.oplg');
+});
+test('market payload uses the same override version for metadata and package filename',()=>{
+  const p=marketPayload({packid:'plugin-a',version:'1.0.0',entry:'dist/index.html'},'owner/repo','v1.2.0','1.2.0');
+  assert.equal(p.version,'1.2.0');
+  assert.equal(p.packageUrl,'https://github.com/owner/repo/releases/download/v1.2.0/plugin-a-1.2.0.oplg');
+});
 test('version inputs cannot inject shell or publish a mismatched tag',()=>{
   assert.throws(()=>releaseMeta({packid:'a',version:'1.0.0'},'1.0.0; echo bad',''));
   assert.throws(()=>releaseMeta({packid:'a',version:'1.0.0'},'','v2.0.0'));
