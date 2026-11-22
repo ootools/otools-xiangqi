@@ -22,5 +22,6 @@
     "对弈",
     "xiangqi",
     "chinese chess"
-  ]
+  ],
+  "openSourceUrl": "https://github.com/ootools/otools-xiangqi"
 }
